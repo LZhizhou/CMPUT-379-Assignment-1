@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 
-
+#define MAX_TEXT 20
 int communication_PID;
 // FIFO file path 
 char *myfifo = "/tmp/myfifo"; 
@@ -18,7 +18,7 @@ void received_signal(int signum){
     signal(signum,received_signal);
     // Open FIFO for Read only 
     fd = open(myfifo, O_RDONLY|O_NONBLOCK); 
-    char received_message[20];
+    char received_message[MAX_TEXT];
     // Read from FIFO 
     read(fd, received_message, sizeof(received_message)); 
 
@@ -46,29 +46,29 @@ int main(int argc, char const *argv[])
         remove(myfifo);
     }
 
-    int fifonum  = mkfifo(myfifo,0777);
-    if (fifonum < 0){
-        printf("%d\n",fifonum);
-        fprintf(stderr, "Could not create fifo %s\n", myfifo);
+    if (mkfifo(myfifo,0777)<0){
         
+        fprintf(stderr, "Could not create fifo %s\n", myfifo);
+        exit(0);
     }
 
     
     while (1) 
     {   
-        char sent_message[20] ; 
+        char sent_message[MAX_TEXT] ; 
         sent_message[0] = '\0';
         // Open FIFO for write only 
         fd = open(myfifo, O_RDWR|O_NONBLOCK); 
         // Take an input sent_messageing from user. 
         // 20 is maximum length 
         
-        fgets(sent_message, 20, stdin); 
+        fgets(sent_message, MAX_TEXT, stdin); 
         
         // Write the input sent_messageing on FIFO 
         // and close it 
         
         if (sent_message[0]>=48 &&sent_message[0]<=126){
+            //check if user enter anything
             write(fd, sent_message, strlen(sent_message)+1);
             close(fd); 
             #if defined(SINGLE)
