@@ -7,10 +7,15 @@
 #include <string.h>
 #include <time.h>
 
-#define MAX_TEXT 20
+#define MAX_TEXT 200
 
 int ascii, element_pos = 0, start = 0, sender_mode = 0, head = 0;
+// ascii: the ascii got according current element_pos
+// element_pos: number of bit got for signal
+// send_mode: 1 single, 2 double
+// head: is 1 if received first signal, if sender_mode is single 
 char res[MAX_TEXT];
+// temp store the message
 struct timespec start_time, end_time;
 unsigned long elapsed_time;
 
@@ -60,12 +65,14 @@ void handler(int signal)
         {
         case 0:
             head = 1;
+            // record the time of the first signal
             clock_gettime(CLOCK_MONOTONIC, &start_time);
             return;
         case 1:
             head = 0;
             clock_gettime(CLOCK_MONOTONIC, &end_time);
             elapsed_time = elapsed_time_ms(&start_time, &end_time);
+            // time interval of two signals
             //printf("time is %ld\n", elapsed_time);
             if (elapsed_time > 1300)
             {
@@ -73,7 +80,7 @@ void handler(int signal)
             }
             element_pos = (element_pos + 1) % 8;
             //printf("element pos is %d\n", element_pos);
-            clock_gettime(CLOCK_MONOTONIC, &start_time);
+            //clock_gettime(CLOCK_MONOTONIC, &start_time);
         }
         break;
 
@@ -95,9 +102,11 @@ void handler(int signal)
             element_pos = (element_pos + 1) % 8;
             break;
         }
+        //decode singals for mode double
     }
     if (element_pos == 0)
     {
+        // received 8 bit, can get the corresponding char 
         res[start] = ascii;
         start++;
         int err = 0;
@@ -109,6 +118,7 @@ void handler(int signal)
                 {
                     err = 1;
                     break;
+                    // error if there is a character is not printable
                 }
             }
             if (err == 0)
@@ -122,6 +132,7 @@ void handler(int signal)
             for (int i = 0;; i++)
             {
                 printf("%c", res[i]);
+                //print message
                 if (res[i] == '\n')
                 {
                     break;
@@ -132,6 +143,7 @@ void handler(int signal)
             for (int i = 0; i < strlen(res) + 1; i++)
             {
                 res[i] = 0;
+                //clear res
             }
         }
         ascii = 0;
@@ -179,13 +191,15 @@ int main(int argc, char const *argv[])
 
         char sent_message[MAX_TEXT];
 
-        fgets(sent_message, MAX_TEXT, stdin);
+        fgets(sent_message, MAX_TEXT-1, stdin);
 
         //check if user enter a word
         if (sent_message[0] >= 33)
         {
-
-            //strcat(sent_message, "\n");
+            
+            if (sent_message[MAX_TEXT-2] >= 33 && sent_message[MAX_TEXT-1] == '\n'){
+                sent_message[MAX_TEXT-1] = '\n';
+            }
             for (int i = 0; i < strlen(sent_message); i++)
 
             //for each letter in the message
