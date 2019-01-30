@@ -100,9 +100,25 @@ void handler(int signal)
     {
         res[start] = ascii;
         start++;
+        int err = 0;
         if (ascii == 10)
         {
-            printf("!");
+            for (int i = 0; i < strlen(res); i++)
+            {
+                if (res[i] != 10 && (res[i] <= 31 || res[i] >= 127))
+                {
+                    err = 1;
+                    break;
+                }
+            }
+            if (err == 0)
+            {
+                printf("!");
+            }
+            else
+            {
+                printf("?");
+            }
             for (int i = 0;; i++)
             {
                 printf("%c", res[i]);
@@ -201,7 +217,6 @@ int main(int argc, char const *argv[])
                     case 2:
                         if (sent_message[i] & (1 << j))
                         {
-
                             kill(pid, SIGUSR2);
                         }
                         else
