@@ -1,88 +1,232 @@
-#define _POSIX_SOURCE
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
+#define _GNU_SOURCE
+#include <errno.h>
 #include <signal.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <time.h>
 
 #define MAX_TEXT 20
-int communication_PID;
-// FIFO file path 
-char *myfifo = "/tmp/myfifo"; 
-int fd;
 
-void received_signal(int signum){
-    signal(signum,received_signal);
-    // Open FIFO for Read only 
-    fd = open(myfifo, O_RDONLY|O_NONBLOCK); 
-    char received_message[MAX_TEXT];
-    // Read from FIFO 
-    read(fd, received_message, sizeof(received_message)); 
+int ascii, element_pos = 0, start = 0, sender_mode = 0;
+char res[MAX_TEXT];
+struct timespec start_time, end_time;
+unsigned long elapsed_time;
 
-    // Print the read message 
-    printf("! %s\n", received_message); 
-    close(fd); 
+//return start_time - end_time/ 10e-6
+long elapsed_time_ms(const struct timespec *start_time, const struct timespec *end_time)
+{
+    unsigned long sec, nsec;
+    if (start_time == NULL || end_time == NULL)
+    {
+        return 0;
+    }
+    sec = end_time->tv_sec - start_time->tv_sec;
+    nsec = end_time->tv_nsec - start_time->tv_nsec;
+    if (sec < 0)
+    {
+        return 0;
+    }
+    if (nsec < 0)
+    {
+        sec--;
+        nsec += 1000000000;
+    }
+    return sec * 1000000 + nsec / 1000;
 }
 
+//ascii is the ascii number of the letter sent though signals, 8 bit
+//element_pos points the 8 bit of binary ascii from left to right
+void handler(int signal)
+{
+
+    // get the mode of the sender
+    switch (sender_mode)
+    {
+    case 0:
+        switch (signal)
+        {
+        case SIGUSR1:
+            sender_mode = 1;
+            return;
+        case SIGUSR2:
+            sender_mode = 2;
+            return;
+        }
+
+    case 1:
+
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+        elapsed_time = elapsed_time_ms(&start_time, &end_time);
+        //printf("time is %ld\n", elapsed_time);
+        int  space;
+        
+        space = (int) (((double) elapsed_time / 3000.0)+0.5);
+        //printf("space is %d\n",space);
+        if (space < 9)
+        {
+            for (int i = 0; i < space; i++)
+            {
+                
+                ascii += 1 << (7 - element_pos);
+                
+                if (++element_pos == 8){
+                    element_pos = 0;
+                    res[start] = ascii;
+                    start++;
+                    
+                    ascii =0;
+
+                }
+                
+            }
+        }
+
+        //ascii += 1 << (7 - element_pos);
+        //printf("ascii is %d\n",ascii);
+        
+        element_pos = (element_pos + 1) % 8;
+        //printf("element pos is %d\n",element_pos);
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+        break;
+
+    case 2:
+        switch (signal)
+        {
+        case SIGUSR2:
+
+            ascii += 1 << (7 - element_pos);
+
+        case SIGUSR1:
+        default:
+            element_pos = (element_pos + 1) % 8;
+            break;
+        }
+    }
+    if (element_pos == 0)
+    {
+        res[start] = ascii;
+        start++;
+        if (ascii == 10)
+        {
+            printf("!");
+            for (int i = 0;; i++)
+            {
+                printf("%c", res[i]);
+                if (res[i] == '\n')
+                {
+                    break;
+                }
+            }
+            //printf("!%s\n", res);
+            start = 0;
+            for (int i = 0; i < strlen(res) + 1; i++)
+            {
+                res[i] = 0;
+            }
+        }
+        ascii = 0;
+    }
+}
 
 int main(int argc, char const *argv[])
 {
+
     printf("Own PID: %d\n", getpid());
+    // print pid of this process
 
-    scanf("%d", &communication_PID);
-    
-    signal(SIGUSR1,received_signal);
-    signal(SIGUSR2,received_signal);
+    struct sigaction sa;
+    sa.sa_handler = handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sa.sa_flags = SA_RESTART;
+    //copy form lab
 
-  
+#if defined(SINGLE)
+    int mode = 1;
+    sigaction(SIGUSR1, &sa, NULL);
+#else
+    int mode = 2;
+    sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
+#endif
 
-    // Creating the named file(FIFO) 
-    // mkfifo(<pathname>, <permission>)
-    umask(0);
-    if (access(myfifo, F_OK) != -1){
-        remove(myfifo);
+    pid_t pid;
+    scanf("%d", &pid);
+    //get the pid want to commnicate with
+    switch (mode)
+    {
+    case 1:
+        kill(pid, SIGUSR1);
+        break;
+
+    case 2:
+        kill(pid, SIGUSR2);
+        break;
     }
+    usleep(200);
+    while (1)
+    {
 
-    if (mkfifo(myfifo,0777)<0){
-        
-        fprintf(stderr, "Could not create fifo %s\n", myfifo);
-        exit(0);
-    }
+        char sent_message[MAX_TEXT];
 
-    
-    while (1) 
-    {   
-        char sent_message[MAX_TEXT] ; 
-        sent_message[0] = '\0';
-        // Open FIFO for write only 
-        fd = open(myfifo, O_RDWR|O_NONBLOCK); 
-        // Take an input sent_messageing from user. 
-        // 20 is maximum length 
-        
-        fgets(sent_message, MAX_TEXT, stdin); 
-        
-        // Write the input sent_messageing on FIFO 
-        // and close it 
-        
-        if (sent_message[0]>=48 &&sent_message[0]<=126){
-            //check if user enter anything
-            write(fd, sent_message, strlen(sent_message)+1);
-            close(fd); 
-            #if defined(SINGLE)
-                kill((pid_t)communication_PID,SIGUSR1);
-            #else
-                kill((pid_t)communication_PID,SIGUSR2);
-            #endif
-        }
+        fgets(sent_message, MAX_TEXT, stdin);
+
+        //check if user enter a word
+        if (sent_message[0] >= 33)
+        {
             
-        
-        
-  
+            //strcat(sent_message, "\n");
+            for (int i = 0; i < strlen(sent_message); i++)
 
-    } 
+            //for each letter in the message
+            {
+
+                for (int j = 7; j >= 0; --j)
+                //encode letter into binary, order of bit is from left to right
+                {
+                    switch (mode)
+                    {
+                    case 1:
+                        if (sent_message[i] & (1 << j))
+                        {
+                            //printf("1");
+                            usleep(1500);
+                        }
+                        else
+                        {
+                            //printf("0");
+
+                            kill(pid, SIGUSR1);
+                        }
+                        break;
+
+                    case 2:
+                        if (sent_message[i] & (1 << j))
+                        {
+
+                            kill(pid, SIGUSR2);
+                        }
+                        else
+                        {
+
+                            kill(pid, SIGUSR1);
+                        }
+                        break;
+                    }
+
+                    usleep(150);
+                }
+            }
+        }
+
+        for (int i = 0; i < strlen(sent_message); i++)
+        {
+            sent_message[i] = 0;
+        }
+    }
 
     return 0;
 }
