@@ -9,7 +9,7 @@
 
 #define MAX_TEXT 20
 
-int ascii, element_pos = 0, start = 0, sender_mode = 0;
+int ascii, element_pos = 0, start = 0, sender_mode = 0, head = 0;
 char res[MAX_TEXT];
 struct timespec start_time, end_time;
 unsigned long elapsed_time;
@@ -56,41 +56,32 @@ void handler(int signal)
         }
 
     case 1:
-
-        clock_gettime(CLOCK_MONOTONIC, &end_time);
-        elapsed_time = elapsed_time_ms(&start_time, &end_time);
-        //printf("time is %ld\n", elapsed_time);
-        int  space;
-        
-        space = (int) (((double) elapsed_time / 3000.0)+0.5);
-        //printf("space is %d\n",space);
-        if (space < 9)
+        switch (head)
         {
-            for (int i = 0; i < space; i++)
+        case 0:
+            head = 1;
+            clock_gettime(CLOCK_MONOTONIC, &start_time);
+            return;
+        case 1:
+            head = 0;
+            clock_gettime(CLOCK_MONOTONIC, &end_time);
+            elapsed_time = elapsed_time_ms(&start_time, &end_time);
+            //printf("time is %ld\n", elapsed_time);
+            if (elapsed_time > 1300)
             {
-                
                 ascii += 1 << (7 - element_pos);
-                
-                if (++element_pos == 8){
-                    element_pos = 0;
-                    res[start] = ascii;
-                    start++;
-                    
-                    ascii =0;
-
-                }
-                
             }
+            element_pos = (element_pos + 1) % 8;
+            //printf("element pos is %d\n", element_pos);
+            clock_gettime(CLOCK_MONOTONIC, &start_time);
         }
+        break;
+
+        //printf("time is %ld\n", elapsed_time);
+        //printf("space is %d\n",space);
 
         //ascii += 1 << (7 - element_pos);
         //printf("ascii is %d\n",ascii);
-        
-        element_pos = (element_pos + 1) % 8;
-        //printf("element pos is %d\n",element_pos);
-        clock_gettime(CLOCK_MONOTONIC, &start_time);
-
-        break;
 
     case 2:
         switch (signal)
@@ -177,7 +168,7 @@ int main(int argc, char const *argv[])
         //check if user enter a word
         if (sent_message[0] >= 33)
         {
-            
+
             //strcat(sent_message, "\n");
             for (int i = 0; i < strlen(sent_message); i++)
 
@@ -193,12 +184,16 @@ int main(int argc, char const *argv[])
                         if (sent_message[i] & (1 << j))
                         {
                             //printf("1");
+                            kill(pid, SIGUSR1);
                             usleep(1500);
+                            kill(pid, SIGUSR1);
                         }
                         else
                         {
                             //printf("0");
 
+                            kill(pid, SIGUSR1);
+                            usleep(150);
                             kill(pid, SIGUSR1);
                         }
                         break;
