@@ -1,8 +1,8 @@
 # CMPUT-379-Assignment-1
 
-name		ccid
-Zhizhou Lu	zhizhou
-Ruoqi Yang	ry
+name		ccid\n
+Zhizhou Lu	zhizhou\n
+Ruoqi Yang	ry\n
 
 Design:
 	Our goal is to transmit the message using signals. For two signal option, we think about using SIGUSR1 and SIGUSR2 to represent “1” and “0” since every character on the ASCII table can be transform into binary number. Similarly, for one signal option, we only have one signal. For this situation we consider of using time interval with different lengths to distinguish “1” and “0”.
