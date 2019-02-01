@@ -2,7 +2,6 @@
 
 
 <ul>
-<li>ccid</li>
 <li>zhizhou</li>
 <li>ry</li>
 </ul>
